@@ -1,0 +1,28 @@
+{
+  "name": "2d",
+  "version": "1.0.0",
+  "description": "简单游戏框架",
+  "main": "gulpfile.js",
+  "dependencies": {
+    "gulp": "^3.9.1",
+    "gulp-rollup": "^2.13.0",
+    "rollup": "^0.43.0"
+  },
+  "devDependencies": {
+    "gulp-jshint": "^2.0.4",
+    "jshint": "^2.9.5"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/susakin/2d.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/susakin/2d/issues"
+  },
+  "homepage": "https://github.com/susakin/2d#readme"
+}

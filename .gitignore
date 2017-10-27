@@ -1,0 +1,10 @@
+*.DS_Store
+*.db
+*.svn
+*.swp
+*.swn
+*.swo
+*.bat
+.idea/*
+build/gulp-css.css
+node_modules
