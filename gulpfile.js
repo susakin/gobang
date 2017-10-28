@@ -10,7 +10,7 @@ gulp.task('bundle',function() {
 		input : 'src/main.js',
 		output : 'build/js/main.min.js',
 		format: "umd",
-		name: 'Player'	
+		name: 'Gobang'	
 	})).pipe(gulp.dest('./build'));
 });
 

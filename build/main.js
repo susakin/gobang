@@ -1,7 +1,7 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
 	typeof define === 'function' && define.amd ? define(factory) :
-	(global.Player = factory());
+	(global.Gobang = factory());
 }(this, (function () { 'use strict';
 
 /**
@@ -111,410 +111,284 @@ var Eventer = createClass(function() {
 });
 
 /**
- * 播放器底部的操作条
- * @param {object} 播放器对象
+ * 简单的围棋实现，
+ * 主要是利用了面向对象和观察者模式，
+ * 对象提供了如下几个方法，下棋，重来，启用机器人，悔棋和撤销悔棋
+ * 在ui逻辑中只需要观察游戏状态的改变来做相应处理，无论是用dom或者是canvas实现
+ * 基本可以做到不需要改变整个游戏对象的逻辑。
  */
-function Toolbar(player){
-    this.player = player;
-    this.getFaBox(player.wrapper);
-    this.getTimeBox();
-    this.getFaProgress();
-    this.getBufferBar();
-    this.getPlayBar();
-    this.getFullscreenBtn();
-    this.getPreviewBox();
-    this.getPreviewInner();
-    this.getPreviewVideo();
-    this.getPlayBtn();
-}
-Toolbar.prototype = {
+var Gobang = createClass(function() {
+    this.countWinnerType();
+    this.set();
+},{
     /**
-     * 生成toolbar 最外层的父元素
-     * @param {object} 播放器父元素
-     */
-    getFaBox : function(wrapper){
-        var style = {
-            "padding-bottom" : "1em",
-            "padding-left": "1.5em",
-            "padding-right": "1em",
-            "line-height": "36px",
-            "background": "linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.1),rgba(0,0,0,.3))",
-            "position" : "absolute",
-            "left" : "0",
-            "bottom" : "0",
-            "width" : "calc(100% - 2.5em)",
-            "height" : "36px",
-            "transition" : "opacity .3s ease",
-            "opacity" : "0"
-        };
-        this.faBox = document.createElement('div');
-        this.styleEnable(this.faBox,style);
-        wrapper.appendChild(this.faBox);
-        wrapper.addEventListener('mousemove',function() {
-            this.faBox.style.opacity = 1;
-        }.bind(this),true);
-        wrapper.addEventListener('mouseout',function() {
-            this.faBox.style.opacity = 0;
-        }.bind(this),true);
+     * 基础属性
+     */ 
+    set : function() {
+        this.currentType = 2;
+        this.over = false;//游戏是否结束
+        this.currentWay = [];//记录下棋的位置
+        this.retract = [];//悔棋的推出的棋子位置
+        this.activeComputer = false;//是否激活电脑
+        this.getChessBoard();
+        this.getPlayWin();
     },
     /**
-     * 生成toolbar 显示时间的元素
-     */
-    getTimeBox : function() {
-        var style = {
-            "float": "left",
-            "width": "70px",
-            "color": "#FFF",
-            "text-shadow": "1px 1px 0 rgba(0,0,0,.5)",
-            "font-size": "14px",
-            "font-family": "monospace",
-            "font-weight": "700",      
-            "text-align" : "center",
-            "height" : "100%"
-        };
-        this.timeBox = document.createElement('time');
-        this.timeBox.innerHTML = "-00:00&nbsp;";
-        this.styleEnable(this.timeBox,style);
-        this.faBox.appendChild(this.timeBox);
-        this.player.on('playProgress',function(per,currentTime,duration) {
-           this.timeBox.innerHTML = '-' + this.format(duration - currentTime) + '&nbsp;';
-        }.bind(this));
-    },
-    /**
-     * 生成toolbar 时间轴的父亲元素
-     */
-    getFaProgress : function() {
-        var style = {
-            "float" : "left",
-            "width" : "calc(100% - 120px)",
-            "padding": "1em 0",
-            "cursor": "ew-resize",
-
-            "position": "relative"         
-        },peLeft;
-        this.faProgress = document.createElement('div');
-        this.styleEnable(this.faProgress,style);
-        this.faBox.appendChild(this.faProgress);
-        this.faProgress.addEventListener('mousemove',function(event) {
-            var width = this.faProgress.getBoundingClientRect().width;
-            var left = this.faProgress.getBoundingClientRect().left;
-            var percent = (event.pageX - left) / width;
-            var temp = percent * (this.player.video.duration || 0);
-            this.previewBox.style.display = 'block';
-            this.video.currentTime = Math.round(temp);
-            peLeft = (this.video.currentTime / this.player.video.duration * 100) + '%';
-            this.previewBox.style.left = 'calc('+ peLeft +' - 1.5px)';
-        }.bind(this),false);
-
-        this.faProgress.addEventListener('mouseout',function() {
-            this.previewBox.style.display = 'none';
-        }.bind(this),false);
-
-        this.faProgress.addEventListener('click',function() {
-            this.playBar.style.width = peLeft;
-            this.player.video.currentTime = this.video.currentTime;
-            this.player.video.play();
-        }.bind(this),false);
-    },
-    /**
-     * 生成缓冲bar
-     */
-    getBufferBar : function() {
-        var style = {
-            "height" : "5px",
-            "max-width" : "100%",
-            "min-width" : "5px",
-            "border-radius" : "9em",
-            "pointer-events" : "none",
-            "position" : "absolute",
-            "background" : "rgba(255,255,255,.1)",
-        };
-        this.bufferBar = document.createElement("i");
-        this.styleEnable(this.bufferBar,style);
-        this.faProgress.appendChild(this.bufferBar);
-        this.player.on('bufferProgress',function(percent) {
-            this.bufferBar.style.width = 100 * percent + '%';
-        }.bind(this));
-    },
-    /**
-     * 生成播放bar
-     */
-    getPlayBar : function() {
-        var style = {
-            "height" : "5px",
-            "max-width" : "100%",
-            "min-width" : "5px",
-            "border-radius" : "9em",
-            "pointer-events" : "none",
-            "position" : "absolute",
-            "background" : "rgba(255,255,255,.9)"
-        };
-        this.playBar = document.createElement("b");
-        this.styleEnable(this.playBar,style);
-        this.faProgress.appendChild(this.playBar);
-        this.player.on('playProgress',function(percent) {
-            this.playBar.style.width = 100 * percent + '%';
-        }.bind(this));
-    },
-    /**
-     * 生成全屏btn
-     */
-    getFullscreenBtn : function() {
-        var style = {
-            "float" : "left",
-            "border" : 0,
-            "margin" : 0,
-            "padding" : 0,
-            "height" : "36px",
-            "width" : "50px",
-            "background" : "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path d=\"M6,12H4V6h13v2H6V12z M22,20H9v-2h11v-4h2V20z\" style=\"fill:rgba(0,0,0,.2);\"/><path d=\"M5,11H3V5h13v2H5V11z M21,19H8v-2h11v-4h2V19z\" style=\"fill:#FFF\"/></svg>') 50% 50% no-repeat",
-            "background-size" : "24px",
-            "cursor" : "pointer"            
-        };
-        this.fullscreenBtn = document.createElement("btn");
-        this.styleEnable(this.fullscreenBtn,style);
-        this.faBox.appendChild(this.fullscreenBtn);
-
-        var el,head = document.getElementsByTagName('head')[0];
-        this.fullscreenBtn.addEventListener('click',function() {
-            var element = document.documentElement;
-            if(el) {
-                el && head.removeChild(el);
-                el = null;
-                if(document.exitFullscreen) { 
-                    document.exitFullscreen(); 
-                } else if(document.mozExitFullScreen) { 
-                    document.mozExitFullScreen(); 
-                } else if(document.webkitExitFullscreen) { 
-                    document.webkitExitFullscreen(); 
-                } 
-            } else {
-                el = document.createElement('style');
-                el.type = 'text/css';
-                el.innerHTML = this.player.wrapperName + "{position:fixed;top:0;left:0;width:100%;height:100%;}";
-                head.appendChild(el);
-                if(element.requestFullScreen) {
-                    element.requestFullScreen(); 
-                } else if(element.mozRequestFullScreen) {
-                    element.mozRequestFullScreen(); 
-                } else if(element.webkitRequestFullScreen) {
-                    element.webkitRequestFullScreen(); 
-                }     
-            }       
-        }.bind(this),false);
-        
-        document.addEventListener("webkitfullscreenchange",function() {
-            if(!(document.fullscreenEnabled || window.fullScreen || document.webkitIsFullScreen || document.msFullscreenEnabled)) {
-                el && head.removeChild(el);
-                el = null;                
-            }
-        },false);
-    },
-    /**
-     * 生成预览容器
-     */
-    getPreviewBox : function() {
-        var style = {
-            "position" : "absolute",
-            "left" : 0,
-            "top" : "calc(1em + 1px)",
-            "height" : "3px",
-            "width" : "3px",
-            "background" : "red",
-            "border-radius" : "2px",
-            "transition" : "0.1s linear left",
-            "display" : "none"
-        };
-        this.previewBox = document.createElement("div");
-        this.styleEnable(this.previewBox,style);
-        this.faProgress.appendChild(this.previewBox);
-    },
-    getPreviewInner : function() {
-        var style = {
-            "position" : "absolute",
-            "bottom" : "25px",
-            "left" : "-81px",
-            "background" : "#222",
-            "padding" : "1px",
-            "border-radius" : "2px",
-            "box-shadow" : "0 1px 2px rgba(0,0,0,.2)",
-            "width" : "160px",
-            "height" : "90px",
-            "pointer-events" : "none"
-        };
-        var bStyle = {
-            "position": "absolute",
-            "left" : "50%",
-            "top" : "100%",
-            "margin-left" : "-5px",
-            "border" : "5px solid transparent",
-            "border-bottom" :"0",
-            "border-top" : "5px solid #222"
-        };
-        this.previewInner = document.createElement("div");
-        var b = document.createElement("b");
-        this.styleEnable(this.previewInner,style);
-        this.styleEnable(b,bStyle);
-        this.previewInner.appendChild(b);
-        this.previewBox.appendChild(this.previewInner);
-    },
-    getPreviewVideo : function() {
-        this.video = document.createElement('video');
-        var attribute = {
-            src : this.player.video.src,
-            poster : this.player.video.poster,
-            width : '100%',
-            height : '100%'
-        };
-        for(var i in attribute) {
-            this.video.setAttribute(i,attribute[i]);
-        }    
-        this.previewInner.appendChild(this.video);
-    },
-    getPlayBtn : function() {
-        this.playBtn = document.createElement('i');
-        var style = {
-            "position" : "absolute",
-            "left" : "50%",
-            "top" : "50%",
-            "margin" : "-80px 0 0 -60px",
-            "border" : "80px solid transparent",
-            "border-right" : 0,
-            "border-left" : "#FFF 140px solid",
-            "transition" : ".3s ease",
-            "transform" : "scale(.05) rotate(90deg)",
-            "opacity" : "0",
-            "pointer-events" : "none"
-        };
-        this.styleEnable(this.playBtn,style);
-        this.player.wrapper.appendChild(this.playBtn);
-    },
-    hidePlayBtn : function() {
-        var style = {
-            "transform" : "scale(.05) rotate(90deg)",
-            "opacity" : "0"
-        };
-        this.styleEnable(this.playBtn,style);
-    },
-    showPlayBtn : function() {
-        var style = {
-            "transform" : "scale(1) rotate(0deg)",
-            "opacity" : "1"
-        };
-        this.styleEnable(this.playBtn,style);
-    },
-    destory : function() {
-        this.player.wrapper.removeChild(this.faBox);
-    },
-    /**
-     * 设置元素
-     * @param {object} [ele] 元素
-     * @param {style} [style] 属性集合
+     * 生成棋盘 没有填子时候保存数据为0
      */    
-    styleEnable : function(ele,style) {
-        for(var i in style) {
-            ele.style[i] = style[i];
-        }        
-    },
-    /**
-     * 格式化时间
-     * @param {number} [seconds] 秒数
-     * @param {sring} 格式化之后的时间
-     */  
-    format : function(showTime) {
-        var seconds = showTime < 0 ? 0 : showTime;
-        var times = [1, 60], result = [ ], temp, digit = 2;
-        while (--digit >= 0) {
-            temp = seconds / times[digit];
-            if (temp >= 1) {
-                temp = parseInt(temp);
-                result.push(temp < 10 ? '0' + temp : temp);
-                seconds -= temp * times[digit];
-            } else {
-                result.push('00');
+    getChessBoard : function(rows,clos) {
+        var chessBoard = [];
+        for(var i = 0; i < 15; i++) {
+            chessBoard[i] = [];
+            for(var j = 0; j < 15; j++) {
+                chessBoard[i][j] = 0;
             }
         }
-        return result.join(":");
-    }
-};
+        this.chessBoard = chessBoard;
+    },
+    /**
+     * 判断是否为和棋
+     * @return {boolean} 结果
+     */      
+    judgeDrawnOne : function() {
+        var count = 0;
+        for(var i = 0; i < 15; i ++) {
+            for(var j = 0; j < 15; j ++) {
+                if(this.chessBoard[i][j]) {
+                    count ++;
+                }
+            }
+        }
+        return count == 15 * 15;
+    },
+    /**
+     * 穷尽所有赢的可能性
+     */  
+    countWinnerType : function() {
+        var wins = [];
+        var count = 0;
+        for (var i = 0; i < 15; i++) {
+            wins[i] = [];
+            for (var j = 0; j < 15; j++) {
+                wins[i][j] = [];
+            }
+        }
+        for (var i = 0; i < 15; i++) {
+            for (var j = 0; j < 11; j++) {
+                for (var k = 0; k < 5; k++) {
+                    wins[i][j + k][count] = true;
+                }
+                count++;
+            }
+        }
+        for (var i = 0; i < 15; i++) {
+            for (var j = 0; j < 11; j++) {
+                for (var k = 0; k < 5; k++) {
+                    wins[j + k][i][count] = true;
+                }
+                count++;
+            }
+        }
+        for (var i = 0; i < 11; i++) {
+            for (var j = 0; j < 11; j++) {
+                for (var k = 0; k < 5; k++) {
+                    wins[i + k][j + k][count] = true;
+                }
+                count++;
+            }
+        }
+        for (var i = 0; i < 11; i++) {
+            for (var j = 14; j > 3; j--) {
+                for (var k = 0; k < 5; k++) {
+                    wins[i + k][j - k][count] = true;
+                }
+                count++;
+            }
+        }
+        this.wins = wins;
+        this.count = count;
+    },
+    /**
+     * 初始化参数
+     */  
+    getPlayWin : function() {
+        this.playerOneWins = [];
+        this.playerTwoWins = [];
+        for(var i = 0; i < this.count; i ++) {
+            this.playerOneWins[i] = 0;
+            this.playerTwoWins[i] = 0;
+        }
+    },
+    /**
+     * 下棋
+     * @param {number} [i] 横坐标
+     * @param {number} [j] 纵坐标
+     * @param {function} [fn] 可以下棋时的回调,画出棋子的操作由框架之外进行
+     * @param {object} 返回游戏对象
+     */  
+    playChess : function(i,j,fn) {
+        if(this.chessBoard[i][j] || this.over) return;
+        this.currentType == 2 ? this.currentType = 1 : this.currentType = 2;
+        typeof fn === 'function' && fn(i,j,this.currentType);
+        this.chessBoard[i][j] = this.currentType;
+        this.currentWay.push({i : i,j : j});
 
-/**
- * player for pc
- * @param {string} [wrapper] video标签的父元素
- */
-var Player = createClass(function(wrapper) {
-	this.wrapperName = wrapper;
-	this.wrapper = document.querySelector(wrapper);
-},{
-	/**
-	 * 播放视频
-	 * @param {string} [src] 视频地址
-	 * @param {string} [poster] 封面地址
-	 * @param {string} [title] 标题
-	 * @param {string} [description] 描述
-	 */
-	playVideo : function(src,poster,title,description) {
-		this.video = document.createElement('video');
-		var attribute = {
-			src : src,
-			poster : poster,
-			playsinline : '',
-			autoplay : '',
-			width : '100%',
-			height : '100%'
-		};
-		for(var i in attribute) {
-			this.video.setAttribute(i,attribute[i]);
-		}
-		this.wrapper.appendChild(this.video);
-		this.bufferProgress(this.video);
-		this.playProgress(this.video);
-		this.toolbar && this.toolbar.destory();
-		this.toolbar = new Toolbar(this);
-		this.playOrPause(this.video);
-	},
-	/**
-	 * 加载缓存回调函数
-	 * @param {object} [video] video对象
-	 */
-	bufferProgress : function(video) {
-		var progress = function() {
-			var percent = 0;
-			if(video.buffered && video.buffered.length > 0 && video.buffered.end && video.duration) {
-				percent = video.buffered.end(0) / video.duration;
-			} else if(video.bytesTotal != undefined && video.bytesTotal > 0 && video.bufferedBytes != undefined){
-				percent = video.bufferedBytes / video.bytesTotal;
-			}
-			percent = Math.min(1, Math.max(0, percent));
-			this.emit('bufferProgress',percent);
-		};
-		video.addEventListener('progress',progress.bind(this),false);
-		video.addEventListener('canplaythrough',progress.bind(this),false);
-	},
-	/**
-	 * 播放时候回调
-	 * @param {object} [video] video对象
-	 */	
-	playProgress : function(video) {
-		video.addEventListener('timeupdate',function() {
-			var percent = video.currentTime/ video.duration;
-			this.emit('playProgress',percent,video.currentTime,video.duration);
-		}.bind(this),false);
-	},
-	playOrPause : function(video) {
-		video.addEventListener('click',function() {
-			if(video.paused) {
-				video.play();
-				this.toolbar.hidePlayBtn();
-			} else {
-				video.pause();
-				this.toolbar.showPlayBtn();	
-				this.emit('pause',video.currentTime);
-			}
-		}.bind(this),true);
-	}
+        if(this.currentType == 1) {
+            for(var k = 0; k < this.count; k++) {
+                if(this.wins[i][j][k]) {
+                    this.playerOneWins[k]++;
+                    this.playerTwoWins[k] = 6;
+                    if(this.playerOneWins[k] == 5) {//玩家1胜出
+                        this.over = true;
+                        this.emit('over',this.currentType);//触发游戏结束
+                    }
+                }
+            } 
+            (!this.over && this.activeComputer) && this.autoPlay();          
+        } else {
+            for(var k = 0; k < this.count; k++) {
+                if(this.wins[i][j][k]) {
+                    this.playerTwoWins[k]++;
+                    this.playerOneWins[k] = 6;
+                    if(this.playerTwoWins[k] == 5) {//玩家2胜出
+                        this.over = true;
+                        this.emit('over',this.currentType);//触发游戏结束
+                    }
+                }
+            }            
+        }
+        //和棋
+        if(this.judgeDrawnOne()) {
+            this.over = true;
+            this.emit('over',0);//触发游戏结束,0代表和棋
+        }
+    },
+    /**
+     * 是否激活电脑
+     * @param {boolean} [flag] 是否激活电脑
+     * @param {object} 返回本对象
+     */    
+    computerPlay : function(flag) {
+        this.activeComputer = flag;
+        (flag && this.currentType == 1) && this.autoPlay();
+        return this;
+    },
+    /**
+     * 电脑走棋
+     */  
+    autoPlay : function() {
+        var res = this.computer();
+        this.playChess(res.i,res.j,function(i,j,currentType){
+            this.emit('computerPlay',i,j);//触发电脑走棋
+        }.bind(this));
+    },
+    /**
+     * 悔棋
+     * @param {object} 返回本对象
+     */  
+    retractChess : function() {
+        var chess = this.currentWay.pop();
+        if(chess) {
+            this.chessBoard[chess.i][chess.j] = 0;
+            this.currentType == 2 ? this.currentType = 1 : this.currentType = 2;
+            this.retract.push(chess);
+            this.emit('retract',chess.i,chess.j);//触发悔棋回调
+        }
+        return this;
+    },  
+    /**
+     * 撤销悔棋
+     * @param {object} 返回本对象
+     */ 
+    revokeRetractChess : function() {
+        var chess = this.retract.pop();
+        chess && this.emit('antRetract',chess.i,chess.j);//触发撤销悔棋操作
+        return this;
+    },
+    /**
+     * 重来一局
+     * @param {object} 返回本对象
+     */     
+    replay : function() {
+        this.set();
+        this.emit('replay');//触发重玩
+        return this;
+    },
+    /**
+     * 电脑玩家
+     * @param {object} 棋子的坐标信息
+     */     
+    computer : function() {
+        var myScore = [];
+        var computerScore = [];
+        //max用于保存最高分数
+        var max = 0;
+        //保存最高分的坐标
+        var u = 0, v = 0;
+        
+        for(var i = 0; i < 15; i++) {
+            myScore[i] = [];
+            computerScore[i] = [];
+            for (var j = 0; j < 15; j++) {
+                myScore[i][j] = 0;
+                computerScore[i][j] = 0;
+            }
+        }
+        //初始化完
+        
+        for(var i = 0; i < 15; i++) {
+            for(var j = 0; j < 15; j++) {
+                if(this.chessBoard[i][j] == 0) {
+                    for(var k = 0; k < this.count; k++) {
+                        if(this.wins[i][j][k]) {
+                            if(this.playerOneWins[k] == 1) {
+                                myScore[i][j] += 200;
+                            } else if(this.playerOneWins[k] == 2) {
+                                myScore[i][j] += 400;
+                            } else if(this.playerOneWins[k] == 3) {
+                                myScore[i][j] += 2000;
+                            } else if(this.playerOneWins[k] == 4) {
+                                myScore[i][j] += 10000;
+                            }
+                            if(this.playerTwoWins[k] == 1) {
+                                computerScore[i][j] += 220;
+                            } else if(this.playerTwoWins[k] == 2) {
+                                computerScore[i][j] += 420;
+                            } else if(this.playerTwoWins[k] == 3) {
+                                computerScore[i][j] += 2100;
+                            } else if(this.playerTwoWins[k] == 4) {
+                                computerScore[i][j] += 20000;
+                            }
+                        }
+                    }
+                    if (myScore[i][j] > max) {
+                        max = myScore[i][j];
+                        u = i;
+                        v = j;
+                    } else if (myScore[i][j] == max) {
+                        if (computerScore[i][j] > computerScore[u][v]) {
+                            u = i;
+                            v = j;
+                        }
+                    }
+                    
+                    if (computerScore[i][j] > max) {
+                        max  = computerScore[i][j];
+                        u = i;
+                        v = j;
+                    } else if (computerScore[i][j] == max) {
+                        if (myScore[i][j] > myScore[u][v]) {
+                            u = i;
+                            v = j;
+                        }
+                    }
+                }
+            }        
+        }
+        return {i : u, j : v}
+    }
 },Eventer);
 
-return Player;
+return Gobang;
 
 })));

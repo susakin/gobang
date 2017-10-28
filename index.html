@@ -11,24 +11,133 @@ body,html{
     height:100%;
 }
 .wrapper{
-	width:300;
-	height:300px;
+	width:600;
+	height:600px;
 	margin:0 auto;
 	position: relative;
-	background: #000;
+	background: #ddd;
+	position: relative;
+}
+.rect{
+	width: 40px;
+	height: 40px;
+	border:1px solid #000;
+	box-sizing:border-box;
+	float:left;
+}
+.chess {
+	width:40px;
+	height:40px;
+	border-radius: 50%;
+	position:absolute;
 }
 </style>
 <body>
-	<div class="wrapper"></div>
-	https://segmentfault.com/q/1010000002740363?_ea=195739
-	http://roll.sohu.com/20130830/n385460416.shtml
-	http://luxun.pro/#/政宗君的复仇/12
-	http://www.jianshu.com/p/404d01b8e713
+	<div class="wrapper">
+	</div>
+	<button id="computer">电脑对战</button>
+	<button id="replay">重玩</button>
+	<button id="re">悔棋</button>
+	<button id="antire">撤销悔棋</button>
 </body>
 <script src="./build/main.js"></script>
 <script>
-	var p = new Player('.wrapper');
-	p.playVideo('http://vjs.zencdn.net/v/oceans.mp4','http://58.33.55.194:12580/thumb/[JyFanSub][Masamune_kun no Ribenji][12][BIG5][720p].mp4.jpg');
+	var gobang = new Gobang();
+	var fa = document.querySelector('.wrapper');
+
+	//画棋子
+	function drawChess(i,j,type) {
+		var chess = document.createElement('div');
+		chess.className = 'chess';
+		var style = {
+			top : i * 40 + 'px',
+			left : j * 40 + 'px',
+			background : type
+		}
+		chess.chessI = i;
+		chess.chessJ = j;
+		for(var i in style) {
+			chess.style[i] = style[i];
+		}
+		fa.appendChild(chess);
+	}
+
+	//生成棋盘
+	for(var i = 0; i < 15*15; i ++) {
+		var child = document.createElement('div');
+		child.className = 'rect';
+		fa.appendChild(child);
+		(function(i) {
+			child.addEventListener('click',function() {
+				gobang.playChess(Math.floor(i / 15),i % 15,function(i,j,type) {
+					if(type == 1) {
+						drawChess(i,j,'#000')
+					} else {
+						drawChess(i,j,'#fff')
+					}
+				});
+			},false);	
+		})(i);
+	}
+	//重玩
+	document.querySelector('#replay').addEventListener('click',function(){
+		gobang.replay();
+	},false);
+	//重玩
+	gobang.on('replay',function() {
+		var chess = document.querySelectorAll('.chess');
+		chess.forEach(function(obj){
+			fa.removeChild(obj);
+		});
+	});
+	//电脑对战
+	document.querySelector('#computer').addEventListener('click',function(){
+		gobang.computerPlay(1);
+	},false);
+	//悔棋
+	document.querySelector('#re').addEventListener('click',function(){
+		gobang.retractChess();
+	},false);
+	//撤销悔棋
+	document.querySelector('#antire').addEventListener('click',function(){
+		gobang.revokeRetractChess();
+	},false);
+
+
+	//监听悔棋
+	gobang.on('retract',function(i,j) {
+		var chess = document.querySelectorAll('.chess');
+		chess.forEach(function(obj){
+			if(obj.chessI == i && obj.chessJ == j) {
+				fa.removeChild(obj);
+			}
+		});		
+	});
+	//监听撤销悔棋
+	gobang.on('antRetract',function(i,j) {
+		gobang.playChess(i,j,function(i,j,type) {
+			if(type == 1) {
+				drawChess(i,j,'#000')
+			} else {
+				drawChess(i,j,'#fff')
+			}			
+		});
+	});
+	//游戏结束
+	gobang.on('over',function(type) {
+		if(type == 1) {
+			alert('黑色方胜利！');
+		} else if(type == 2){
+			alert('白色方胜利');
+		} else {
+			alert('和棋');
+		}
+	});
+	//电脑走棋
+	gobang.on('computerPlay',function(i,j) {
+		drawChess(i,j,'#fff');
+	});
+
 </script>
 </html>
 
