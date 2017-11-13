@@ -224,7 +224,7 @@ var Gobang = createClass(function() {
      * @param {number} [i] 横坐标
      * @param {number} [j] 纵坐标
      * @param {function} [fn] 可以下棋时的回调,画出棋子的操作由框架之外进行
-     * @param {object} 返回游戏对象
+     * @return {object} 返回游戏对象
      */  
     playChess : function(i,j,fn) {
         if(this.chessBoard[i][j] || this.over) return;
@@ -266,7 +266,7 @@ var Gobang = createClass(function() {
     /**
      * 是否激活电脑
      * @param {boolean} [flag] 是否激活电脑
-     * @param {object} 返回本对象
+     * @return {object} 返回本对象
      */    
     computerPlay : function(flag) {
         this.activeComputer = flag;
@@ -284,10 +284,11 @@ var Gobang = createClass(function() {
     },
     /**
      * 悔棋
-     * @param {object} 返回本对象
+     * @return {object} 返回本对象
      */  
     retractChess : function() {
         var chess = this.currentWay.pop();
+        if(this.over) return;
         if(chess) {
             this.chessBoard[chess.i][chess.j] = 0;
             this.currentType == 2 ? this.currentType = 1 : this.currentType = 2;
@@ -298,25 +299,26 @@ var Gobang = createClass(function() {
     },  
     /**
      * 撤销悔棋
-     * @param {object} 返回本对象
+     * @return {object} 返回本对象
      */ 
     revokeRetractChess : function() {
         var chess = this.retract.pop();
+        if(this.over) return;
         chess && this.emit('antRetract',chess.i,chess.j);//触发撤销悔棋操作
         return this;
     },
     /**
      * 重来一局
-     * @param {object} 返回本对象
+     * @return {object} 返回本对象
      */     
-    replay : function() {
+    replay : function(fn) {
         this.set();
         this.emit('replay');//触发重玩
         return this;
     },
     /**
      * 电脑玩家
-     * @param {object} 棋子的坐标信息
+     * @return {object} 棋子的坐标信息
      */     
     computer : function() {
         var myScore = [];
