@@ -160,7 +160,7 @@
 
 	//监听悔棋
 	gobang.on('retract',function(i,j) {
-		board.destory(i,j);
+		board.killChess(i,j);
 	});
 	//监听撤销悔棋
 	gobang.on('antRetract',function(i,j) {
